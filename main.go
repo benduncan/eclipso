@@ -161,7 +161,7 @@ func lookupHost(host string, triesLeft int) ([]dns.RR, error) {
 }
 
 func main() {
-	domains = make([]Domains, 3)
+	domains = make([]Domains, 5)
 
 	domains[0].Domain = "test.com."
 	domains[0].Type = dns.TypeA
