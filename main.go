@@ -189,7 +189,7 @@ func lookupHost(host string, triesLeft int) ([]dns.RR, error) {
 }
 
 func main() {
-	domains = make([]Domains, 8)
+	domains = make([]Domains, 9)
 
 	// TODO: Move to a JSON file, obj/storage, NoSQL
 	domains[0].Domain = "test.com."
@@ -234,11 +234,17 @@ func main() {
 	domains[6].TTL = 60 * 60 * 24
 	domains[6].Address = "ns2.phasegrid.net."
 
-	domains[7].Domain = "google.com."
+	domains[7].Domain = "ns1.phasegrid.net."
 	domains[7].Type = dns.TypeA
 	domains[7].Class = dns.ClassINET
-	domains[7].TTL = 300
-	domains[7].Address = "8.4.4.4"
+	domains[7].TTL = 60 * 60 * 24
+	domains[7].Address = "216.218.163.100"
+
+	domains[8].Domain = "ns2.phasegrid.net."
+	domains[8].Type = dns.TypeA
+	domains[8].Class = dns.ClassINET
+	domains[8].TTL = 60 * 60 * 24
+	domains[8].Address = "216.218.163.101"
 
 	// 216.218.163.99
 
