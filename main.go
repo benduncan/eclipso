@@ -189,7 +189,7 @@ func lookupHost(host string, triesLeft int) ([]dns.RR, error) {
 }
 
 func main() {
-	domains = make([]Domains, 9)
+	domains = make([]Domains, 16)
 
 	// TODO: Move to a JSON file, obj/storage, NoSQL
 	domains[0].Domain = "test.com."
@@ -216,7 +216,7 @@ func main() {
 	domains[3].TTL = 300
 	domains[3].Address = "216.218.163.99"
 
-	domains[4].Domain = "xeon-ilo.us-west-1.phasegrid.net."
+	domains[4].Domain = "ilo.xeon.us-west-1.phasegrid.net."
 	domains[4].Type = dns.TypeA
 	domains[4].Class = dns.ClassINET
 	domains[4].TTL = 60
@@ -234,17 +234,59 @@ func main() {
 	domains[6].TTL = 60 * 60 * 24
 	domains[6].Address = "ns2.phasegrid.net."
 
-	domains[7].Domain = "ns1.phasegrid.net."
-	domains[7].Type = dns.TypeA
+	domains[7].Domain = "phasegrid.net."
+	domains[7].Type = dns.TypeNS
 	domains[7].Class = dns.ClassINET
 	domains[7].TTL = 60 * 60 * 24
-	domains[7].Address = "216.218.163.100"
+	domains[7].Address = "ns3.phasegrid.net."
 
-	domains[8].Domain = "ns2.phasegrid.net."
+	domains[8].Domain = "ns1.phasegrid.net."
 	domains[8].Type = dns.TypeA
 	domains[8].Class = dns.ClassINET
 	domains[8].TTL = 60 * 60 * 24
-	domains[8].Address = "216.218.163.101"
+	domains[8].Address = "216.218.163.102"
+
+	domains[9].Domain = "ns2.phasegrid.net."
+	domains[9].Type = dns.TypeA
+	domains[9].Class = dns.ClassINET
+	domains[9].TTL = 60 * 60 * 24
+	domains[9].Address = "216.218.163.101"
+
+	domains[10].Domain = "ns3.phasegrid.net."
+	domains[10].Type = dns.TypeA
+	domains[10].Class = dns.ClassINET
+	domains[10].TTL = 60 * 60 * 24
+	domains[10].Address = "152.67.248.9"
+
+	domains[11].Domain = "neon.us-west-2.phasegrid.net."
+	domains[11].Type = dns.TypeA
+	domains[11].Class = dns.ClassINET
+	domains[11].TTL = 60 * 60 * 24
+	domains[11].Address = "152.67.248.9"
+
+	domains[12].Domain = "radon.us-west-1.phasegrid.net."
+	domains[12].Type = dns.TypeA
+	domains[12].Class = dns.ClassINET
+	domains[12].TTL = 300
+	domains[12].Address = "216.218.163.104"
+
+	domains[13].Domain = "idrac.radon.us-west-1.phasegrid.net."
+	domains[13].Type = dns.TypeA
+	domains[13].Class = dns.ClassINET
+	domains[13].TTL = 300
+	domains[13].Address = "216.218.163.100"
+
+	domains[14].Domain = "pfsense.radon.us-west-1.phasegrid.net."
+	domains[14].Type = dns.TypeA
+	domains[14].Class = dns.ClassINET
+	domains[14].TTL = 300
+	domains[14].Address = "216.218.163.105"
+
+	domains[15].Domain = "pfsense.xeon.us-west-1.phasegrid.net."
+	domains[15].Type = dns.TypeA
+	domains[15].Class = dns.ClassINET
+	domains[15].TTL = 300
+	domains[15].Address = "216.218.163.103"
 
 	// 216.218.163.99
 
