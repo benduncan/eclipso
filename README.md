@@ -2,6 +2,7 @@
 
 ## Basic Roadmap
 
+* Use S3 config to start - or shared config file between nodes?
 * Use distributed k/v system in Go, native
 * Support ipv4
 * MX, A, CNAME support

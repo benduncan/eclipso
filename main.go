@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -296,8 +295,15 @@ func main() {
 		host = "0.0.0.0"
 	}
 
-	srv := &dns.Server{Addr: host + ":" + strconv.Itoa(53), Net: "udp"}
+	var port = os.Getenv("PORT")
+
+	if port == "" {
+		port = "53"
+	}
+
+	srv := &dns.Server{Addr: fmt.Sprintf("%s:%s", host, port), Net: "udp"}
 	srv.Handler = &handler{}
+
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to set udp listener %s\n", err.Error())
 	}
