@@ -255,7 +255,7 @@ func main() {
 	domains[10].Type = dns.TypeA
 	domains[10].Class = dns.ClassINET
 	domains[10].TTL = 60 * 60 * 24
-	domains[10].Address = "152.67.248.9"
+	domains[10].Address = "129.159.43.166"
 
 	domains[11].Domain = "neon.us-west-2.phasegrid.net."
 	domains[11].Type = dns.TypeA
