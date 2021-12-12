@@ -1,0 +1,15 @@
+[Unit]
+Description=Eclipso DNS service
+Wants=network.target
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment=HOST="10.0.0.5"
+ExecStart=/home/benduncan/eclipso
+#ExecStop=/home/weblogic/scripts/stop_WLS_FR.sh
+StandardOutput=syslog
+
+[Install]
+WantedBy=multi-user.target
