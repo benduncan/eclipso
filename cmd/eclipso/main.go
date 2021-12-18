@@ -15,7 +15,7 @@ func main() {
 	var zone_dir = os.Getenv("ZONE_DIR")
 
 	if zone_dir == "" {
-		zone_dir = "domains/"
+		zone_dir = "config/domains/"
 	}
 
 	config.ReadZoneFiles(zone_dir)

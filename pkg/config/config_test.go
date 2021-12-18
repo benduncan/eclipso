@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,7 @@ address = "e15316.a.akamaiedge.net."
 
 	config := Config{}
 	toml.Unmarshal([]byte(file), &config)
-	ApplyDefaults(&config)
+	ApplyDefaults(&config, time.Now())
 
 	//assert.(t, 1.1, config.Version)
 
@@ -76,7 +77,7 @@ address = "213.189.1.4"
 
 	config := Config{}
 	toml.Unmarshal([]byte(file), &config)
-	ApplyDefaults(&config)
+	ApplyDefaults(&config, time.Now())
 
 	//assert.(t, 1.1, config.Version)
 
@@ -104,7 +105,7 @@ domain = "www."
 
 	config := Config{}
 	toml.Unmarshal([]byte(file), &config)
-	ApplyDefaults(&config)
+	ApplyDefaults(&config, time.Now())
 
 	//assert.(t, 1.1, config.Version)
 
