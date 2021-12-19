@@ -2,6 +2,7 @@ package backend
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -245,6 +246,30 @@ func lookupDomain(domain string) (d []config.Records, s bool) {
 	return d, s
 }
 
+// TODO: Improve the lookup function, use a pointer?
+func lookupSOA(domain string) (soa string) {
+
+	for i := 0; i < len((*DomainDB)); i++ {
+
+		for i2 := 0; i2 < len((*DomainDB)[i].Records); i2++ {
+
+			if (*DomainDB)[i].Records[i2].Domain == domain {
+				soa = (*DomainDB)[i].Domain.SOA
+				break
+			}
+
+		}
+
+	}
+
+	// If no SOA exists, return a record (however invalid, need to add improved checks)
+	if soa == "" {
+		soa = fmt.Sprintf("ns.%s", domain)
+	}
+
+	return
+}
+
 func lookupHost(host string, triesLeft int) ([]dns.RR, error) {
 	m1 := new(dns.Msg)
 	m1.Id = dns.Id()
@@ -270,7 +295,7 @@ func lookupHost(host string, triesLeft int) ([]dns.RR, error) {
 
 func SOA(domain string) dns.RR {
 	return &dns.SOA{Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 60},
-		Ns:      "master." + domain,
+		Ns:      lookupSOA(domain),
 		Mbox:    "hostmaster." + domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,

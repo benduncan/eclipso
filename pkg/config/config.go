@@ -29,6 +29,7 @@ type Config struct {
 
 type Domain struct {
 	Domain   string
+	SOA      string
 	Created  time.Time
 	Modified time.Time
 	Verified bool
