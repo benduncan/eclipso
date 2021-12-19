@@ -65,7 +65,7 @@ func init() {
 
 func MonitorConfig(zone_dir string) {
 
-	var s3retry = os.Getenv("S3_RETRY")
+	var s3retry = os.Getenv("S3_SYNC_RETRY")
 
 	if s3retry == "" {
 		s3retry = "60"
@@ -114,9 +114,9 @@ func MonitorConfig(zone_dir string) {
 								if *item.LastModified != HostedZones[i].Domain.Modified {
 									fmt.Println("WE HAVE A NEW CONFIG FILE, RELOAD!")
 
-									mu.Lock()
+									//mu.Lock()
 									HostedZones[i], err = ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
-									mu.Unlock()
+									//mu.Unlock()
 
 									if err != nil {
 										log.Fatalf("Error %s", err)
