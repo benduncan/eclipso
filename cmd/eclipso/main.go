@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/benduncan/eclipso/pkg/backend"
-	"github.com/benduncan/eclipso/pkg/config"
-	"github.com/miekg/dns"
-	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -17,12 +14,6 @@ func main() {
 	if zone_dir == "" {
 		zone_dir = "config/domains/"
 	}
-
-	config.ReadZoneFiles(zone_dir)
-
-	backend.DomainDB = &config.HostedZones
-
-	go config.MonitorConfig(zone_dir)
 
 	var host = os.Getenv("HOST")
 
@@ -36,10 +27,10 @@ func main() {
 		port = "53"
 	}
 
-	srv := &dns.Server{Addr: fmt.Sprintf("%s:%s", host, port), Net: "udp"}
-	srv.Handler = &backend.Handler{}
+	err := backend.StartDaemon(zone_dir, host, port)
 
-	if err := srv.ListenAndServe(); err != nil {
+	if err != nil {
 		log.Fatalf("Failed to set udp listener %s\n", err.Error())
 	}
+
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,7 +10,50 @@ import (
 )
 
 func TestDomainLookup(t *testing.T) {
-	config.LookupDomain()
+	conf := GenerateTestDomains(1000)
+
+	assert.Equal(t, 1000, len(conf.Domain))
+
+	// Lookup a domain easily
+	for i := 0; i < 1000; i++ {
+		lookup := DomainLookup{Domain: fmt.Sprintf("test%d.net", i), Type: 1, Class: 1}
+
+		assert.Equal(t, 4, len(conf.Records[lookup]))
+
+		for i2 := 1; i < 5; i++ {
+
+			if len(conf.Records[lookup]) == 4 {
+				assert.Equal(t, fmt.Sprintf("213.189.1.%d", i2), conf.Records[lookup][i2-1].Address)
+			}
+
+		}
+
+	}
+
+	// Find records for test1.net
+	/*
+		records := conf.Domain["test1.net"].RecordRef
+
+		// Delete marked domains
+		for _, v := range records {
+			delete(conf.Records, v)
+		}
+
+		if entry, ok := conf.Domain["test1.net"]; ok {
+			entry.RecordRef = []DomainLookup{}
+			conf.Domain["test1.net"] = entry
+		}
+
+		fmt.Println("Post rm Record =>", conf.Records[records[0]])
+		fmt.Println("Post RecordRef =>", conf.Domain["test1.net"].RecordRef)
+	*/
+
+	fmt.Println("RecordRef =>", conf.Domain["test1.net"].RecordRef)
+	records := conf.Domain["test1.net"].RecordRef
+
+	conf.DeleteDomainConf("test1.net")
+	fmt.Println("Post rm Record =>", conf.Records[records[0]])
+	fmt.Println("Post RecordRef =>", conf.Domain["test1.net"].RecordRef)
 
 }
 

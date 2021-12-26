@@ -13,11 +13,25 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var DomainDB *[]config.ConfigArr
-var conf *config.Config
-
 type Handler struct {
-	Conf config.Config
+	Conf *config.Config
+}
+
+func StartDaemon(zone_dir, host, port string) (err error) {
+
+	cfg := config.ReadZoneFiles(zone_dir)
+
+	go cfg.MonitorConfig(zone_dir)
+
+	srv := &dns.Server{Addr: fmt.Sprintf("%s:%s", host, port), Net: "udp"}
+	srv.Handler = &Handler{Conf: &cfg}
+
+	if err := srv.ListenAndServe(); err != nil {
+		return err
+		//log.Fatalf("Failed to set udp listener %s\n", err.Error())
+	}
+
+	return
 }
 
 func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
@@ -35,8 +49,6 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	log.Printf("DNS Request: %q => %q (type %d)", domain, w.RemoteAddr(), r.Question[0].Qtype)
 
 	// Return matching domain records for the request
-	//records, ok := lookupDomain(config.DomainLookup{Domain: domain, Type: r.Question[0].Qtype, Class: r.Question[0].Qclass})
-
 	qq := config.DomainLookup{Domain: domain, Type: r.Question[0].Qtype, Class: r.Question[0].Qclass}
 	ok := len(this.Conf.Records[qq])
 
@@ -46,7 +58,6 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		w.WriteMsg(&msg)
 		// Consider delay/rate limit to prevent abuse
 		return
-
 	}
 
 	// Loop through the domain records and append a response for each

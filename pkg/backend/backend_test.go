@@ -140,23 +140,23 @@ address = "google-site-verification=%s"
 
 func DNSBackend(t *testing.T) {
 
-	//cfg2 := new(config.Config)
+	/*
+		go func() {
+
+			if err := backend.StartDaemon("./testconfig/", "127.0.0.1", "5354"); err != nil {
+				assert.Nil(t, err)
+			}
+
+
+	*/
 
 	cfg := config.ReadZoneFiles("./testconfig/")
-
-	//_, _ = config.ReadZone("testdf./", time.Now())
-
-	//backend.DomainDB = &config.HostedZones
 
 	var host = "127.0.0.1"
 	var port = 5354
 
 	srv := &dns.Server{Addr: fmt.Sprintf("%s:%d", host, port), Net: "udp"}
-	srv.Handler = &backend.Handler{Conf: cfg}
-
-	//cfg.Dump(cfg)
-
-	//backend.Handler.Conf = config.ReadZoneFiles("./testconfig/")
+	srv.Handler = &backend.Handler{Conf: &cfg}
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
@@ -174,6 +174,20 @@ func LocalQuery(t *testing.T) {
 	m := dns.Msg{}
 
 	iprange := 1
+
+	// Step 0: Test bogus domains
+
+	m.SetQuestion(dns.Fqdn("invalid.net"), dns.TypeA)
+	r, _, err := c.Exchange(&m, ns)
+
+	if err != nil {
+		assert.Nil(t, err)
+	}
+	if r.Rcode != dns.RcodeSuccess {
+		assert.NotEqual(t, r.Rcode, dns.RcodeSuccess)
+	}
+
+	assert.Equal(t, 0, len(r.Answer))
 
 	for i := 'a'; i <= 'z'; i++ {
 

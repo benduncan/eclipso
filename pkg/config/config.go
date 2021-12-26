@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,13 +34,14 @@ type ConfigArr struct {
 }
 
 type Domain struct {
-	Domain   string
-	SOA      string
-	Created  time.Time
-	Modified time.Time
-	Verified bool
-	Active   bool
-	OwnerID  uint32
+	Domain    string
+	SOA       string
+	Created   time.Time
+	Modified  time.Time
+	Verified  bool
+	Active    bool
+	OwnerID   uint32
+	RecordRef []DomainLookup
 }
 
 type Defaults struct {
@@ -68,11 +70,10 @@ type DomainLookup struct {
 	Class  uint16
 }
 
+/*
 var config Config
-
 var HostedZones []ConfigArr
-
-var mu sync.Mutex
+*/
 
 func init() {
 	_, logignore := os.LookupEnv("ECLIPSO_LOG_IGNORE")
@@ -82,54 +83,37 @@ func init() {
 	}
 }
 
-func (config *Config) LookupDomain() {
+func GenerateTestDomains(num int) (t Config) {
 
-	fmt.Println(config)
+	t.Records = make(map[DomainLookup][]Records, 1)
+	t.Domain = make(map[string]Domain, 1)
 
-	config.Records = make(map[DomainLookup][]Records, 1000)
-
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < num; i++ {
 
 		domain := fmt.Sprintf("test%d.net", i)
-		//config.Records[domain] = make(map[DomainLookup][]Records, 4)
 
-		for i2 := 10; i2 < 13; i2++ {
+		var refs []DomainLookup
+
+		for i2 := 1; i2 < 5; i2++ {
 
 			ip := fmt.Sprintf("213.189.1.%d", i2)
 			record := DomainLookup{Domain: domain, Type: 1, Class: 1}
-			config.Records[record] = append(config.Records[record], Records{Domain: domain, Address: ip})
+			t.Records[record] = append(t.Records[record], Records{Domain: domain, Address: ip})
+			refs = append(refs, record)
 
 		}
 
 		record := DomainLookup{Domain: domain, Type: 16, Class: 1}
-		config.Records[record] = append(config.Records[record], Records{Domain: domain, Address: "TESTRECORD"})
+		t.Records[record] = append(t.Records[record], Records{Domain: domain, Address: "TESTRECORD"})
+		refs = append(refs, record)
+
+		t.Domain[domain] = Domain{Domain: domain, SOA: fmt.Sprintf("ns.%s", domain), RecordRef: refs}
 
 	}
-
-	/*
-		this.Domains["ben.com"] = make(map[DomainLookup][]Records, 100)
-
-		this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}] = append(this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}], Records{Domain: "ben.com", Address: "203.14.5.3"})
-
-		this.Domains["ben.com"][DomainLookup{Domain: "www.ben.com", Type: 1, Class: 1}] = append(this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}], Records{Domain: "www.ben.com", Address: "213.189.1.4"})
-
-		this.Domains["ben.com"][DomainLookup{Domain: "www.ben.com", Type: 1, Class: 1}] = append(this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}], Records{Domain: "www.ben.com", Address: "213.189.1.5"})
-	*/
-
-	fmt.Println(config.Records)
-
-	// Lookup a domain easily
-	lookup := DomainLookup{Domain: "test1.net", Type: 1, Class: 1}
-	fmt.Println("First record => ", config.Records[lookup][0])
-
-	for _, item := range config.Records[lookup] {
-
-		fmt.Println("Loop => ", item)
-	}
-
+	return t
 }
 
-func MonitorConfig(zone_dir string) {
+func (config Config) MonitorConfig(zone_dir string) {
 
 	var s3retry = os.Getenv("S3_SYNC_RETRY")
 
@@ -172,23 +156,41 @@ func MonitorConfig(zone_dir string) {
 
 						domain := strings.Replace(*item.Key, ".toml", "", 1)
 
-						for i := 0; i < len(HostedZones); i++ {
+						// Add a new record
+						_, ok := config.Domain[domain]
 
-							if HostedZones[i].Domain.Domain == domain {
-								fmt.Println(domain, "> ", HostedZones[i].Domain.Modified, "=>", *item.LastModified)
+						// A new domain exists, add
+						if ok == false {
 
-								if *item.LastModified != HostedZones[i].Domain.Modified {
+							myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
+
+							if err == nil {
+								config.AddZone(myconfig)
+							} else {
+								log.Fatalf("Unable to download item %q, %v", item, err)
+							}
+
+						}
+
+						for _, v := range config.Domain {
+
+							if v.Domain == domain {
+								fmt.Println(domain, "> ", v.Modified, "=>", *item.LastModified)
+
+								if *item.LastModified != v.Modified {
 									fmt.Println("WE HAVE A NEW CONFIG FILE, RELOAD!")
 
-									mu.Lock()
-									HostedZones[i], err = ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
-									mu.Unlock()
+									myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
 
-									if err != nil {
-										log.Fatalf("Error %s", err)
+									if err == nil {
+										config.DeleteZone(v.Domain)
+										config.AddZone(myconfig)
+									} else {
+										log.Fatalf("Unable to download item %q, %v", item, err)
 									}
 
 								}
+
 							}
 
 						}
@@ -226,26 +228,38 @@ func MonitorConfig(zone_dir string) {
 
 					if event.Op&fsnotify.Write == fsnotify.Write {
 						log.Println("modified file:", event.Name)
-						//myconf, _ := ReadZone(event.Name, event.Modified)
-						//fmt.Println(myconf)
-						//ReadZoneFiles(zone_dir)
-						//reloadConf()
+
+						myconfig, err := ReadZone(event.Name, time.Now())
+
+						if err == nil {
+							config.DeleteZone(myconfig.Domain.Domain)
+							config.AddZone(myconfig)
+						}
+
 					}
 
 					if event.Op&fsnotify.Create == fsnotify.Create {
 						log.Println("new file:", event.Name)
-						//myconf, _ := ReadZone(event.Name)
-						//fmt.Println(myconf)
-						//ReadZoneFiles(zone_dir)
-						//reloadConf()
+
+						myconfig, err := ReadZone(event.Name, time.Now())
+
+						if err == nil {
+							config.DeleteZone(myconfig.Domain.Domain)
+							config.AddZone(myconfig)
+						}
 
 					}
 
 					if event.Op&fsnotify.Remove == fsnotify.Remove {
 						log.Println("remove file:", event.Name)
-						//ReadZoneFiles(zone_dir)
-						//reloadConf()
-						//myconf := config.ReadZone(event.Name)
+
+						// TODO: Improve domain lookup and confirmation
+						domain := filepath.Base(event.Name)
+						domain = strings.Replace(domain, ".toml", "", 1)
+
+						fmt.Println("Delete => ", domain)
+						config.DeleteZone(domain)
+
 					}
 
 				case err, ok := <-watcher.Errors:
@@ -370,14 +384,9 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 			if strings.HasSuffix(*item.Key, ".toml") {
 				myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
 
-				if err != nil {
-					log.Errorf("Error parsing file %s", err)
-				}
-
-				//config.Domains[myconfig.Domain.Domain] = make(map[DomainLookup][]Records, 4)
-				HostedZones = append(HostedZones, myconfig)
-
-				if err != nil {
+				if err == nil {
+					t.AddZone(myconfig)
+				} else {
 					log.Fatalf("Unable to download item %q, %v", item, err)
 				}
 
@@ -400,16 +409,7 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 			myconfig, err := ReadZone(filename, file.ModTime())
 
 			if err == nil {
-				// Append the new domain record
-				t.Domain[myconfig.Domain.Domain] = myconfig.Domain
-
-				// Loop through each domain and create the hashmap for lookups
-				for _, item := range myconfig.Records {
-
-					t.Records[DomainLookup{Domain: item.Domain, Type: item.Type, Class: item.Class}] = append(t.Records[DomainLookup{Domain: item.Domain, Type: item.Type, Class: item.Class}], item)
-
-				}
-
+				t.AddZone(myconfig)
 			}
 
 		}
@@ -424,6 +424,46 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 	return t
 
 	//defer mu.Unlock()
+}
+
+func (t Config) AddZone(myconfig ConfigArr) {
+
+	// Loop through each domain and create the hashmap for lookups
+	for _, item := range myconfig.Records {
+
+		record := DomainLookup{Domain: item.Domain, Type: item.Type, Class: item.Class}
+		t.Records[record] = append(t.Records[record], item)
+
+		myconfig.Domain.RecordRef = append(myconfig.Domain.RecordRef, record)
+
+	}
+
+	// Append the new domain record
+	t.Domain[myconfig.Domain.Domain] = myconfig.Domain
+
+}
+
+func (t Config) DeleteZone(domain string) {
+
+	// Find records for test1.net
+	record, ok := t.Domain[domain]
+
+	if ok == false {
+		return
+	}
+
+	t.mu.Lock()
+	// Delete marked domains
+	for _, v := range record.RecordRef {
+		delete(t.Records, v)
+	}
+
+	if entry, ok := t.Domain[domain]; ok {
+		entry.RecordRef = []DomainLookup{}
+		t.Domain[domain] = entry
+	}
+	t.mu.Unlock()
+
 }
 
 func ReadZone(zone_file string, lastModified time.Time) (myconfig ConfigArr, err error) {
