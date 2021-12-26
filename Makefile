@@ -25,6 +25,9 @@ build:
 bench:
 	ECLIPSO_LOG_IGNORE=1 go test -bench=. ./pkg/backend
 
+race:
+	ECLIPSO_LOG_IGNORE=1 go test -race ./pkg/backend
+
 run:
 ifeq ($(ENV), dev)
 	$(MAKE) build
@@ -44,7 +47,6 @@ docker:
 	@echo "\n....Building latest docker image and uploading to GCR ...."
 	$(MAKE) test
 	docker buildx build --platform linux/amd64,linux/arm/v8 -t $(GO_PROJECT_NAME) .
-	#docker build -t $(GO_PROJECT_NAME) .
 	docker tag $(GO_PROJECT_NAME) calacode/$(GO_PROJECT_NAME):latest
 	docker push calacode/$(GO_PROJECT_NAME):latest
 

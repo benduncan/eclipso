@@ -1,4 +1,47 @@
-# eclipso
+# Eclipso - High performance DNS daemon
+
+```
+┌─┐┌─┐┬  ┬┌─┐┌─┐┌─┐
+├┤ │  │  │├─┘└─┐│ │
+└─┘└─┘┴─┘┴┴  └─┘└─┘
+```
+
+# Project objectives
+
+* High performance - Speed wins
+* Lightweight - Bloat and large dependency chains not welcome
+* Container first - Built to be run as a container
+
+# Installation
+
+```
+make build
+```
+
+## Benchmarking
+
+```
+make bench
+```
+
+Will spin up 100,000 local domains and randomly query a subset of local hosted domains within a 60 sec period to benchmark throughput.
+
+## Run within docker
+
+
+
+## Run as a standalone daemon
+
+## Configuration
+
+## Storage methods
+
+* Local filesystem
+* S3 bucket
+* S3 bucket (with SQS notofications, pending)
+* DyanmoDB (pending)
+
+
 
 ## Basic Roadmap
 

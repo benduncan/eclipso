@@ -20,7 +20,12 @@ import (
 )
 
 type Config struct {
-	mu       sync.Mutex
+	Records map[DomainLookup][]Records
+	Domain  map[string]Domain
+	mu      sync.RWMutex
+}
+
+type ConfigArr struct {
 	Version  float32
 	Domain   Domain
 	Defaults Defaults
@@ -45,6 +50,7 @@ type Defaults struct {
 
 type Records struct {
 	Domain     string
+	Root       string
 	TTL        uint32
 	Type       uint16
 	Class      uint16
@@ -52,7 +58,20 @@ type Records struct {
 	Address    string
 }
 
-var HostedZones []Config
+type DomainTable struct {
+	Domain string
+}
+
+type DomainLookup struct {
+	Domain string
+	Type   uint16
+	Class  uint16
+}
+
+var config Config
+
+var HostedZones []ConfigArr
+
 var mu sync.Mutex
 
 func init() {
@@ -61,6 +80,53 @@ func init() {
 	if logignore {
 		log.SetLevel(log.FatalLevel)
 	}
+}
+
+func (config *Config) LookupDomain() {
+
+	fmt.Println(config)
+
+	config.Records = make(map[DomainLookup][]Records, 1000)
+
+	for i := 0; i < 1000; i++ {
+
+		domain := fmt.Sprintf("test%d.net", i)
+		//config.Records[domain] = make(map[DomainLookup][]Records, 4)
+
+		for i2 := 10; i2 < 13; i2++ {
+
+			ip := fmt.Sprintf("213.189.1.%d", i2)
+			record := DomainLookup{Domain: domain, Type: 1, Class: 1}
+			config.Records[record] = append(config.Records[record], Records{Domain: domain, Address: ip})
+
+		}
+
+		record := DomainLookup{Domain: domain, Type: 16, Class: 1}
+		config.Records[record] = append(config.Records[record], Records{Domain: domain, Address: "TESTRECORD"})
+
+	}
+
+	/*
+		this.Domains["ben.com"] = make(map[DomainLookup][]Records, 100)
+
+		this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}] = append(this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}], Records{Domain: "ben.com", Address: "203.14.5.3"})
+
+		this.Domains["ben.com"][DomainLookup{Domain: "www.ben.com", Type: 1, Class: 1}] = append(this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}], Records{Domain: "www.ben.com", Address: "213.189.1.4"})
+
+		this.Domains["ben.com"][DomainLookup{Domain: "www.ben.com", Type: 1, Class: 1}] = append(this.Domains["ben.com"][DomainLookup{Domain: "ben.com", Type: 16, Class: 1}], Records{Domain: "www.ben.com", Address: "213.189.1.5"})
+	*/
+
+	fmt.Println(config.Records)
+
+	// Lookup a domain easily
+	lookup := DomainLookup{Domain: "test1.net", Type: 1, Class: 1}
+	fmt.Println("First record => ", config.Records[lookup][0])
+
+	for _, item := range config.Records[lookup] {
+
+		fmt.Println("Loop => ", item)
+	}
+
 }
 
 func MonitorConfig(zone_dir string) {
@@ -114,9 +180,9 @@ func MonitorConfig(zone_dir string) {
 								if *item.LastModified != HostedZones[i].Domain.Modified {
 									fmt.Println("WE HAVE A NEW CONFIG FILE, RELOAD!")
 
-									//mu.Lock()
+									mu.Lock()
 									HostedZones[i], err = ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
-									//mu.Unlock()
+									mu.Unlock()
 
 									if err != nil {
 										log.Fatalf("Error %s", err)
@@ -162,7 +228,7 @@ func MonitorConfig(zone_dir string) {
 						log.Println("modified file:", event.Name)
 						//myconf, _ := ReadZone(event.Name, event.Modified)
 						//fmt.Println(myconf)
-						ReadZoneFiles(zone_dir)
+						//ReadZoneFiles(zone_dir)
 						//reloadConf()
 					}
 
@@ -170,14 +236,14 @@ func MonitorConfig(zone_dir string) {
 						log.Println("new file:", event.Name)
 						//myconf, _ := ReadZone(event.Name)
 						//fmt.Println(myconf)
-						ReadZoneFiles(zone_dir)
+						//ReadZoneFiles(zone_dir)
 						//reloadConf()
 
 					}
 
 					if event.Op&fsnotify.Remove == fsnotify.Remove {
 						log.Println("remove file:", event.Name)
-						ReadZoneFiles(zone_dir)
+						//ReadZoneFiles(zone_dir)
 						//reloadConf()
 						//myconf := config.ReadZone(event.Name)
 					}
@@ -202,7 +268,7 @@ func MonitorConfig(zone_dir string) {
 
 }
 
-func ApplyDefaults(config *Config, lastModified time.Time) {
+func ApplyDefaults(config *ConfigArr, lastModified time.Time) {
 
 	var ttl uint32
 	var rtype uint16
@@ -268,12 +334,15 @@ func ApplyDefaults(config *Config, lastModified time.Time) {
 
 }
 
-func ReadZoneFiles(zone_dir string) {
+func ReadZoneFiles(zone_dir string) (t Config) {
+
+	t.Domain = make(map[string]Domain)
+	t.Records = make(map[DomainLookup][]Records)
 
 	start := time.Now()
 
-	mu.Lock()
-	HostedZones = nil
+	//config.mu.Lock()
+	//t = make(map[DomainLookup][]Records, 16)
 
 	fmt.Println("Zone dir =>", zone_dir)
 
@@ -305,6 +374,7 @@ func ReadZoneFiles(zone_dir string) {
 					log.Errorf("Error parsing file %s", err)
 				}
 
+				//config.Domains[myconfig.Domain.Domain] = make(map[DomainLookup][]Records, 4)
 				HostedZones = append(HostedZones, myconfig)
 
 				if err != nil {
@@ -330,23 +400,33 @@ func ReadZoneFiles(zone_dir string) {
 			myconfig, err := ReadZone(filename, file.ModTime())
 
 			if err == nil {
-				HostedZones = append(HostedZones, myconfig)
+				// Append the new domain record
+				t.Domain[myconfig.Domain.Domain] = myconfig.Domain
+
+				// Loop through each domain and create the hashmap for lookups
+				for _, item := range myconfig.Records {
+
+					t.Records[DomainLookup{Domain: item.Domain, Type: item.Type, Class: item.Class}] = append(t.Records[DomainLookup{Domain: item.Domain, Type: item.Type, Class: item.Class}], item)
+
+				}
+
 			}
 
 		}
 
-		defer mu.Unlock()
-
 	}
 
-	t := time.Now()
-	elapsed := t.Sub(start)
+	timer := time.Now()
+	elapsed := timer.Sub(start)
 
 	log.Info("Config files read in => ", elapsed)
 
+	return t
+
+	//defer mu.Unlock()
 }
 
-func ReadZone(zone_file string, lastModified time.Time) (myconfig Config, err error) {
+func ReadZone(zone_file string, lastModified time.Time) (myconfig ConfigArr, err error) {
 
 	log.Info("Parsing => ", zone_file, lastModified)
 

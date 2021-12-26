@@ -4,8 +4,6 @@ FROM golang:1.17-alpine AS build-env
 RUN apk add build-base git
 
 ENV DNS_PORT 53/udp
-#ENV GOPATH /workspace/eclipso
-#ENV GOBIN /workspace/eclipso/bin
 
 ADD ./ /workspace/eclipso
 WORKDIR /workspace/eclipso

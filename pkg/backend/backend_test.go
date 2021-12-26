@@ -140,15 +140,23 @@ address = "google-site-verification=%s"
 
 func DNSBackend(t *testing.T) {
 
-	config.ReadZoneFiles("./testconfig/")
+	//cfg2 := new(config.Config)
 
-	backend.DomainDB = &config.HostedZones
+	cfg := config.ReadZoneFiles("./testconfig/")
+
+	//_, _ = config.ReadZone("testdf./", time.Now())
+
+	//backend.DomainDB = &config.HostedZones
 
 	var host = "127.0.0.1"
 	var port = 5354
 
 	srv := &dns.Server{Addr: fmt.Sprintf("%s:%d", host, port), Net: "udp"}
-	srv.Handler = &backend.Handler{}
+	srv.Handler = &backend.Handler{Conf: cfg}
+
+	//cfg.Dump(cfg)
+
+	//backend.Handler.Conf = config.ReadZoneFiles("./testconfig/")
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
@@ -179,6 +187,8 @@ func LocalQuery(t *testing.T) {
 		if r.Rcode != dns.RcodeSuccess {
 			assert.NotEqual(t, r.Rcode, dns.RcodeSuccess)
 		}
+
+		assert.NotEqual(t, 0, len(r.Answer))
 
 		for _, k := range r.Answer {
 			if key, ok := k.(*dns.A); ok {

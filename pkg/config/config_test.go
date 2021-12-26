@@ -8,6 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDomainLookup(t *testing.T) {
+	config.LookupDomain()
+
+}
+
 func TestConfigGood(t *testing.T) {
 
 	file := `
@@ -38,7 +43,7 @@ class = 1
 address = "e15316.a.akamaiedge.net."
 `
 
-	config := Config{}
+	config := ConfigArr{}
 	toml.Unmarshal([]byte(file), &config)
 	ApplyDefaults(&config, time.Now())
 
@@ -75,7 +80,7 @@ domain = "web3.defi."
 address = "213.189.1.4"
 `
 
-	config := Config{}
+	config := ConfigArr{}
 	toml.Unmarshal([]byte(file), &config)
 	ApplyDefaults(&config, time.Now())
 
@@ -103,7 +108,7 @@ domain = "bad.defi."
 domain = "www."
 `
 
-	config := Config{}
+	config := ConfigArr{}
 	toml.Unmarshal([]byte(file), &config)
 	ApplyDefaults(&config, time.Now())
 

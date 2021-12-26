@@ -13,9 +13,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var DomainDB *[]config.Config
+var DomainDB *[]config.ConfigArr
+var conf *config.Config
 
-type Handler struct{}
+type Handler struct {
+	Conf config.Config
+}
 
 func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	msg := dns.Msg{}
@@ -32,9 +35,12 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	log.Printf("DNS Request: %q => %q (type %d)", domain, w.RemoteAddr(), r.Question[0].Qtype)
 
 	// Return matching domain records for the request
-	records, ok := lookupDomain(domain)
+	//records, ok := lookupDomain(config.DomainLookup{Domain: domain, Type: r.Question[0].Qtype, Class: r.Question[0].Qclass})
 
-	if !ok {
+	qq := config.DomainLookup{Domain: domain, Type: r.Question[0].Qtype, Class: r.Question[0].Qclass}
+	ok := len(this.Conf.Records[qq])
+
+	if ok == 0 {
 		// Return `NODATA` response
 		msg.SetRcode(r, dns.RcodeRefused)
 		w.WriteMsg(&msg)
@@ -44,8 +50,8 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	// Loop through the domain records and append a response for each
-	for i := 0; i < len(records); i++ {
-		record := records[i]
+	for i := 0; i < len(this.Conf.Records[qq]); i++ {
+		record := this.Conf.Records[qq][i]
 
 		// The domain is authoritative
 		msg.Authoritative = true
@@ -113,7 +119,7 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		// SOA case
 		case dns.TypeSOA:
-			msg.Answer = []dns.RR{SOA(record.Domain)}
+			msg.Answer = []dns.RR{this.SOA(record.Domain)}
 			continue
 
 		// TXT record case
@@ -142,7 +148,7 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				})
 
 				// Lookup additional A/AAAA records
-				extra := lookupExtra(record.Address)
+				extra := this.lookupExtra(record.Address, r.Question[0].Qtype, r.Question[0].Qclass)
 				if extra != nil {
 					for _, rr := range extra {
 						msg.Extra = append(msg.Extra, rr)
@@ -162,7 +168,7 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 				})
 
 				// Lookup additional A/AAAA records
-				extra := lookupExtra(record.Address)
+				extra := this.lookupExtra(record.Address, r.Question[0].Qtype, r.Question[0].Qclass)
 				if extra != nil {
 					for _, rr := range extra {
 						msg.Extra = append(msg.Extra, rr)
@@ -181,7 +187,7 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	// Return `NXDOMAIN`, we are authoritative however domain does not exist.
 	if len(msg.Answer) == 0 {
 		msg.SetRcode(r, dns.RcodeNameError)
-		msg.Ns = []dns.RR{SOA(domain)}
+		msg.Ns = []dns.RR{this.SOA(domain)}
 	}
 
 	// Check max record length
@@ -195,13 +201,20 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 }
 
-func lookupExtra(address string) (msg []dns.RR) {
+func (this *Handler) lookupExtra(address string, msgtype uint16, msgclass uint16) (msg []dns.RR) {
 
-	extraRecords, _ := lookupDomain(address)
+	query := config.DomainLookup{Domain: address, Type: msgtype, Class: msgclass}
+	ok := len(this.Conf.Records[query])
+
+	if ok == 0 {
+		return
+	}
+
+	//extraRecords, _ := lookupDomain(address)
 
 	// Append extra fields if required
-	for i2 := 0; i2 < len(extraRecords); i2++ {
-		r := extraRecords[i2]
+	for i2 := 0; i2 < len(this.Conf.Records[query]); i2++ {
+		r := this.Conf.Records[query][i2]
 
 		if r.Domain == address && r.Type == dns.TypeA {
 			msg = append(msg, &dns.A{
@@ -225,42 +238,33 @@ func lookupExtra(address string) (msg []dns.RR) {
 }
 
 // TODO: Improve the lookup function, use a pointer?
-func lookupDomain(domain string) (d []config.Records, s bool) {
+func lookupDomain(lookup config.DomainLookup) bool {
 
-	for i := 0; i < len((*DomainDB)); i++ {
+	/*
+		for i := 0; i < len((*DomainDB)); i++ {
 
-		for i2 := 0; i2 < len((*DomainDB)[i].Records); i2++ {
+			for i2 := 0; i2 < len((*DomainDB)[i].Records); i2++ {
 
-			if (*DomainDB)[i].Records[i2].Domain == domain {
-				d = append(d, (*DomainDB)[i].Records[i2])
+				if (*DomainDB)[i].Records[i2].Domain == domain {
+					d = append(d, (*DomainDB)[i].Records[i2])
+				}
+
 			}
 
 		}
 
-	}
+		if len(d) > 0 {
+			s = true
+		}
+	*/
+	return true
 
-	if len(d) > 0 {
-		s = true
-	}
-
-	return d, s
 }
 
 // TODO: Improve the lookup function, use a pointer?
-func lookupSOA(domain string) (soa string) {
+func (this *Handler) lookupSOA(domain string) (soa string) {
 
-	for i := 0; i < len((*DomainDB)); i++ {
-
-		for i2 := 0; i2 < len((*DomainDB)[i].Records); i2++ {
-
-			if (*DomainDB)[i].Records[i2].Domain == domain {
-				soa = (*DomainDB)[i].Domain.SOA
-				break
-			}
-
-		}
-
-	}
+	soa = this.Conf.Domain[domain].SOA
 
 	// If no SOA exists, return a record (however invalid, need to add improved checks)
 	if soa == "" {
@@ -293,9 +297,9 @@ func lookupHost(host string, triesLeft int) ([]dns.RR, error) {
 	return in.Answer, err
 }
 
-func SOA(domain string) dns.RR {
+func (this *Handler) SOA(domain string) dns.RR {
 	return &dns.SOA{Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 60},
-		Ns:      lookupSOA(domain),
+		Ns:      this.lookupSOA(domain),
 		Mbox:    "hostmaster." + domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
