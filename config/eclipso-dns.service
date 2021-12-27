@@ -6,9 +6,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-Environment=HOST="10.0.0.5"
+Environment=PORT="53"
 ExecStart=/home/benduncan/eclipso
-#ExecStop=/home/weblogic/scripts/stop_WLS_FR.sh
 StandardOutput=syslog
 
 [Install]
