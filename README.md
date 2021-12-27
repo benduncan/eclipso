@@ -235,18 +235,18 @@ Version 1.0.X:
 
 Immediate roadmap:
 
-- [] Support additional zone types (SRV)
-- [] DynamoDB support
-- [] DynamoDB stream support
-- [] Improve benchmarking
-- [] Improve CLI flag support and env usage
+- [ ] Support additional zone types (SRV)
+- [ ] DynamoDB support
+- [ ] DynamoDB stream support
+- [ ] Improve benchmarking
+- [ ] Improve CLI flag support and env usage
 
 General roadmap:
 
-- [] Optimise local hashmap use Net.IP (v4/v6) types
-- [] Additional API daemon to add/delete/update zone files
-- [] Health-check support, change return address if end-point not answering
-- [] DNS resolver option - Raw lookups via root-servers to act as a DNS forwarder
+- [ ] Optimise local hashmap use Net.IP (v4/v6) types
+- [ ] Additional API daemon to add/delete/update zone files
+- [ ] Health-check support, change return address if end-point not answering
+- [ ] DNS resolver option - Raw lookups via root-servers to act as a DNS forwarder
 
 # Benchmarking
 
