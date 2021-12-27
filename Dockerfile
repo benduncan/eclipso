@@ -11,7 +11,7 @@ WORKDIR /workspace/eclipso
 #RUN make clean
 RUN make build
 
-RUN apk del build-base git
+# RUN apk del build-base git
 
 # Next, just copy the golang binary, create a lightweight environment
 
@@ -20,5 +20,5 @@ WORKDIR /workspace/eclipso
 RUN apk add ca-certificates
 COPY --from=build-env /workspace/eclipso/bin/ /workspace/eclipso/bin/
 
-EXPOSE $API_PORT
+EXPOSE $DNS_PORT
 ENTRYPOINT ["/workspace/eclipso/bin/eclipso"]

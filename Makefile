@@ -23,7 +23,9 @@ build:
 	$(MAKE) go_build
 
 bench:
-	ECLIPSO_LOG_IGNORE=1 go test -bench=. ./pkg/backend -count 5 -benchmem
+	ECLIPSO_LOG_IGNORE=1 go test -bench=. ./pkg/backend -count 5 -benchmem | tee benchmark.out
+	benchstat benchmark.out
+
 
 prof:
 	ECLIPSO_LOG_IGNORE=1 go test -cpuprofile cpu.prof -memprofile mem.prof -bench=. ./pkg/backend
@@ -49,8 +51,8 @@ clean:
 docker:
 	@echo "\n....Building latest docker image and uploading to GCR ...."
 	$(MAKE) test
-	docker buildx build --platform linux/amd64,linux/arm/v8 -t $(GO_PROJECT_NAME) .
-	docker tag $(GO_PROJECT_NAME) calacode/$(GO_PROJECT_NAME):latest
-	docker push calacode/$(GO_PROJECT_NAME):latest
+	docker buildx build --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 --tag calacode/$(GO_PROJECT_NAME):latest .
+	#docker tag $(GO_PROJECT_NAME) calacode/$(GO_PROJECT_NAME):latest
+	#docker push calacode/$(GO_PROJECT_NAME):latest
 
 .PHONY: docker db_seed go_build go_dep_install go_prep_install go_run build run restart historical-data

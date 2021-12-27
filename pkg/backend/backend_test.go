@@ -21,12 +21,8 @@ func init() {
 
 }
 func TestRunner(t *testing.T) {
-
-	//t.Run("A=ConfigSetup", ConfigSetup)
-	//t.Run("A=DNSBackend", DNSBackend)
 	t.Run("A=LocalQuery", LocalQuery)
 	t.Run("A=CleanupConfig", CleanupConfig)
-
 }
 
 func ConfigSetup(t *testing.T) {
@@ -43,10 +39,10 @@ func ConfigSetup(t *testing.T) {
 		md5str = fmt.Sprintf("site-verification-hello_%c.net", i)
 		md5str = fmt.Sprintf("%x", md5.Sum([]byte(md5str)))
 
-		filename := fmt.Sprintf("testconfig/hello_%c.net", i)
+		filename := fmt.Sprintf("testconfig/hello_%c.net.toml", i)
 
 		output := `
-# Domain configration file in TOML format.
+# Domain configuration file in TOML format.
 version = 1.0
 
 # Domain settings
@@ -139,16 +135,6 @@ address = "google-site-verification=%s"
 }
 
 func DNSBackend(t *testing.T) {
-
-	/*
-		go func() {
-
-			if err := backend.StartDaemon("./testconfig/", "127.0.0.1", "5354"); err != nil {
-				assert.Nil(t, err)
-			}
-
-
-	*/
 
 	cfg := config.ReadZoneFiles("./testconfig/")
 
@@ -302,33 +288,12 @@ func LocalQuery(t *testing.T) {
 
 		iprange++
 	}
-
-	//time.Sleep(time.Minute * 2)
 }
 
 func CleanupConfig(t *testing.T) {
 	err := os.RemoveAll("./testconfig")
 	assert.Nil(t, err)
-
 }
-
-/*
-func Fib(n int) int {
-	if n < 2 {
-		return n
-	}
-	return Fib(n-1) + Fib(n-2)
-}
-
-// from fib_test.go
-func BenchmarkFib10(b *testing.B) {
-	// run the Fib function b.N times
-	for n := 0; n < b.N; n++ {
-		Fib(10)
-	}
-}
-
-*/
 
 func BenchmarkDNSQueryA(b *testing.B) {
 
