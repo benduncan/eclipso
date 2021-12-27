@@ -23,6 +23,9 @@ build:
 	$(MAKE) go_build
 
 bench:
+	ECLIPSO_LOG_IGNORE=1 go test -bench=. ./pkg/backend -count 5 -benchmem
+
+prof:
 	ECLIPSO_LOG_IGNORE=1 go test -cpuprofile cpu.prof -memprofile mem.prof -bench=. ./pkg/backend
 
 race:

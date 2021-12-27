@@ -62,7 +62,10 @@ func (this *Handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 	// Loop through the domain records and append a response for each
 	for i := 0; i < len(this.Conf.Records[qq]); i++ {
-		record := this.Conf.Records[qq][i]
+
+		this.Conf.Mu.RLock()
+		record := &this.Conf.Records[qq][i]
+		this.Conf.Mu.RUnlock()
 
 		// The domain is authoritative
 		msg.Authoritative = true

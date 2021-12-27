@@ -1,11 +1,14 @@
 package main
 
 import (
-	"log"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/benduncan/eclipso/pkg/backend"
 )
+
+const eclipso_version = "1.0.1"
 
 func main() {
 
@@ -26,6 +29,18 @@ func main() {
 	if port == "" {
 		port = "53"
 	}
+
+	log.Printf(`
+
+
+	┌─┐┌─┐┬  ┬┌─┐┌─┐┌─┐
+	├┤ │  │  │├─┘└─┐│ │
+	└─┘└─┘┴─┘┴┴  └─┘└─┘	
+	High-performance DNS daemon
+	v%s
+
+	
+	`, eclipso_version)
 
 	err := backend.StartDaemon(zone_dir, host, port)
 

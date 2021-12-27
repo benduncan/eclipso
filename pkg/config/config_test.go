@@ -51,7 +51,7 @@ func TestDomainLookup(t *testing.T) {
 	fmt.Println("RecordRef =>", conf.Domain["test1.net"].RecordRef)
 	records := conf.Domain["test1.net"].RecordRef
 
-	conf.DeleteDomainConf("test1.net")
+	conf.DeleteZone("test1.net")
 	fmt.Println("Post rm Record =>", conf.Records[records[0]])
 	fmt.Println("Post RecordRef =>", conf.Domain["test1.net"].RecordRef)
 

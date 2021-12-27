@@ -23,7 +23,7 @@ import (
 type Config struct {
 	Records map[DomainLookup][]Records
 	Domain  map[string]Domain
-	mu      sync.RWMutex
+	Mu      sync.RWMutex
 }
 
 type ConfigArr struct {
@@ -81,6 +81,14 @@ func init() {
 	if logignore {
 		log.SetLevel(log.FatalLevel)
 	}
+
+	// Check debug log
+	_, logdebug := os.LookupEnv("ECLIPSO_LOG_DEBUG")
+
+	if logdebug {
+		log.SetLevel(log.DebugLevel)
+	}
+
 }
 
 func GenerateTestDomains(num int) (t Config) {
@@ -127,16 +135,16 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 		go func() {
 
+			sess := session.Must(session.NewSession())
+
+			// Create S3 service client
+			svc := s3.New(sess)
+
 			for {
 
 				time.Sleep(time.Second * time.Duration(s3retrysecs))
 
-				fmt.Println("In loop to check state")
-
-				sess := session.Must(session.NewSession())
-
-				// Create S3 service client
-				svc := s3.New(sess)
+				log.Info("MonitorConfig: S3 check sync state")
 
 				path := strings.Split(zone_dir, "s3://")
 
@@ -146,28 +154,38 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 				// Get the list of items
 				resp, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(path[1])})
+
 				if err != nil {
 					log.Fatalf("Unable to list items in bucket %q, %v", path, err)
 				}
 
+				configsync := make(map[string]bool, 10)
+
 				for _, item := range resp.Contents {
+
+					log.Debugf("MonitorConfig: Scanning %s", *item.Key)
 
 					if strings.HasSuffix(*item.Key, ".toml") {
 
 						domain := strings.Replace(*item.Key, ".toml", "", 1)
 
-						// Add a new record
+						// Append to the list of available domains
+						configsync[domain] = true
+
+						// Confirm if the record already exists
 						_, ok := config.Domain[domain]
 
-						// A new domain exists, add
+						// A new domain exists, detect filename must match domain entry.
 						if ok == false {
 
 							myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
 
+							err = checkConfigDomainMatch(*item.Key, myconfig.Domain.Domain)
+
 							if err == nil {
 								config.AddZone(myconfig)
 							} else {
-								log.Fatalf("Unable to download item %q, %v", item, err)
+								log.Errorf("Domain %s and config file (%s) mismatch, entry skipped. %s", domain, *item.Key, err)
 							}
 
 						}
@@ -175,18 +193,22 @@ func (config Config) MonitorConfig(zone_dir string) {
 						for _, v := range config.Domain {
 
 							if v.Domain == domain {
-								fmt.Println(domain, "> ", v.Modified, "=>", *item.LastModified)
+
+								//fmt.Println(domain, "> ", v.Modified, "=>", *item.LastModified)
 
 								if *item.LastModified != v.Modified {
-									fmt.Println("WE HAVE A NEW CONFIG FILE, RELOAD!")
+
+									log.Infof("MonitorConfig: New config file detected (%s), reloading", *item.Key)
 
 									myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
+
+									err = checkConfigDomainMatch(*item.Key, myconfig.Domain.Domain)
 
 									if err == nil {
 										config.DeleteZone(v.Domain)
 										config.AddZone(myconfig)
 									} else {
-										log.Fatalf("Unable to download item %q, %v", item, err)
+										log.Errorf("Domain %s and config file (%s) mismatch, entry skipped. %s", domain, *item.Key, err)
 									}
 
 								}
@@ -195,10 +217,20 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 						}
 
-						if err != nil {
-							log.Fatalf("Unable to download item %q, %v", item, err)
-						}
+					}
 
+				}
+
+				// Confirm which domains are no longer on S3, purge from our local cache
+				for domain, _ := range config.Domain {
+
+					_, ok := configsync[domain]
+
+					log.Debugf("MonitorConfig: Delete Check (%s)", domain)
+
+					if ok == false {
+						// Domain is no longer, purge from our cache
+						config.DeleteZone(domain)
 					}
 
 				}
@@ -231,9 +263,13 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 						myconfig, err := ReadZone(event.Name, time.Now())
 
+						err = checkConfigDomainMatch(event.Name, myconfig.Domain.Domain)
+
 						if err == nil {
 							config.DeleteZone(myconfig.Domain.Domain)
 							config.AddZone(myconfig)
+						} else {
+							log.Error(err)
 						}
 
 					}
@@ -243,9 +279,13 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 						myconfig, err := ReadZone(event.Name, time.Now())
 
+						err = checkConfigDomainMatch(event.Name, myconfig.Domain.Domain)
+
 						if err == nil {
 							config.DeleteZone(myconfig.Domain.Domain)
 							config.AddZone(myconfig)
+						} else {
+							log.Error(err)
 						}
 
 					}
@@ -350,15 +390,12 @@ func ApplyDefaults(config *ConfigArr, lastModified time.Time) {
 
 func ReadZoneFiles(zone_dir string) (t Config) {
 
-	t.Domain = make(map[string]Domain)
-	t.Records = make(map[DomainLookup][]Records)
+	log.Infof("ReadZoneFiles: Reading %s", zone_dir)
+
+	t.Domain = make(map[string]Domain, 4)
+	t.Records = make(map[DomainLookup][]Records, 4)
 
 	start := time.Now()
-
-	//config.mu.Lock()
-	//t = make(map[DomainLookup][]Records, 16)
-
-	fmt.Println("Zone dir =>", zone_dir)
 
 	if strings.HasPrefix(zone_dir, "s3://") {
 
@@ -376,7 +413,8 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 		// Get the list of items
 		resp, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(path[1])})
 		if err != nil {
-			log.Fatalf("Unable to list items in bucket %q, %v", path, err)
+			log.Errorf("Unable to list items in bucket %q, %v", path, err)
+			return
 		}
 
 		for _, item := range resp.Contents {
@@ -385,9 +423,17 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 				myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
 
 				if err == nil {
-					t.AddZone(myconfig)
+
+					err = checkConfigDomainMatch(*item.Key, myconfig.Domain.Domain)
+
+					if err == nil {
+						t.AddZone(myconfig)
+					} else {
+						log.Errorf("Unable to download item %q, %v", item, err)
+					}
+
 				} else {
-					log.Fatalf("Unable to download item %q, %v", item, err)
+					log.Errorf("Unable to download item %q, %v", item, err)
 				}
 
 			}
@@ -399,7 +445,7 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 		files, err := ioutil.ReadDir(zone_dir)
 
 		if err != nil {
-			log.Panicf("failed reading directory: %s", err)
+			log.Errorf("failed reading directory: %s", err)
 		}
 
 		for _, file := range files {
@@ -419,15 +465,14 @@ func ReadZoneFiles(zone_dir string) (t Config) {
 	timer := time.Now()
 	elapsed := timer.Sub(start)
 
-	log.Info("Config files read in => ", elapsed)
+	log.Infof("Config files read in (%s)", elapsed)
 
 	return t
-
-	//defer mu.Unlock()
 }
 
 func (t Config) AddZone(myconfig ConfigArr) {
 
+	t.Mu.Lock()
 	// Loop through each domain and create the hashmap for lookups
 	for _, item := range myconfig.Records {
 
@@ -441,6 +486,9 @@ func (t Config) AddZone(myconfig ConfigArr) {
 	// Append the new domain record
 	t.Domain[myconfig.Domain.Domain] = myconfig.Domain
 
+	t.Mu.Unlock()
+	log.Infof("Added (%s) to local DNS zone DB", myconfig.Domain.Domain)
+
 }
 
 func (t Config) DeleteZone(domain string) {
@@ -452,23 +500,30 @@ func (t Config) DeleteZone(domain string) {
 		return
 	}
 
-	t.mu.Lock()
+	t.Mu.Lock()
 	// Delete marked domains
 	for _, v := range record.RecordRef {
 		delete(t.Records, v)
 	}
 
-	if entry, ok := t.Domain[domain]; ok {
-		entry.RecordRef = []DomainLookup{}
-		t.Domain[domain] = entry
-	}
-	t.mu.Unlock()
+	/*
+		if entry, ok := t.Domain[domain]; ok {
+			entry.RecordRef = []DomainLookup{}
+			t.Domain[domain] = entry
+		}
+	*/
+
+	delete(t.Domain, domain)
+
+	t.Mu.Unlock()
+
+	log.Infof("DeleteZone: Removed (%s) from local DNS zone DB", domain)
 
 }
 
 func ReadZone(zone_file string, lastModified time.Time) (myconfig ConfigArr, err error) {
 
-	log.Info("Parsing => ", zone_file, lastModified)
+	log.Infof("ReadZone: Parsing Zone file (%s) (%s)", zone_file, lastModified)
 
 	if strings.HasPrefix(zone_file, "s3://") {
 
@@ -518,4 +573,17 @@ func ReadZone(zone_file string, lastModified time.Time) (myconfig ConfigArr, err
 
 	return
 
+}
+
+func checkConfigDomainMatch(filename string, domain string) (err error) {
+
+	// TODO: Improve domain lookup and confirmation
+	filecheck := filepath.Base(filename)
+	filecheck = strings.Replace(filename, ".toml", "", 1)
+
+	if filecheck != domain {
+		err = fmt.Errorf("Config file %s (%s) does not match domain entry %s", filename, filecheck, domain)
+	}
+
+	return
 }
