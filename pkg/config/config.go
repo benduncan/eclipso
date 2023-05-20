@@ -156,7 +156,8 @@ func (config Config) MonitorConfig(zone_dir string) {
 				resp, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(path[1])})
 
 				if err != nil {
-					log.Fatalf("Unable to list items in bucket %q, %v", path, err)
+					log.Warnf("Unable to list items in bucket %q, %v", path, err)
+					return
 				}
 
 				configsync := make(map[string]bool, 10)
@@ -176,9 +177,13 @@ func (config Config) MonitorConfig(zone_dir string) {
 						_, ok := config.Domain[domain]
 
 						// A new domain exists, detect filename must match domain entry.
-						if ok == false {
+						if !ok {
 
 							myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
+
+							if err != nil {
+								log.Warn(err)
+							}
 
 							err = checkConfigDomainMatch(*item.Key, myconfig.Domain.Domain)
 
@@ -201,6 +206,10 @@ func (config Config) MonitorConfig(zone_dir string) {
 									log.Infof("MonitorConfig: New config file detected (%s), reloading", *item.Key)
 
 									myconfig, err := ReadZone(fmt.Sprintf("%s/%s", zone_dir, *item.Key), *item.LastModified)
+
+									if err != nil {
+										log.Warn(err)
+									}
 
 									err = checkConfigDomainMatch(*item.Key, myconfig.Domain.Domain)
 
@@ -228,7 +237,7 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 					log.Debugf("MonitorConfig: Delete Check (%s)", domain)
 
-					if ok == false {
+					if !ok {
 						// Domain is no longer, purge from our cache
 						config.DeleteZone(domain)
 					}
@@ -263,6 +272,10 @@ func (config Config) MonitorConfig(zone_dir string) {
 
 						myconfig, err := ReadZone(event.Name, time.Now())
 
+						if err != nil {
+							log.Warn(err)
+						}
+
 						err = checkConfigDomainMatch(event.Name, myconfig.Domain.Domain)
 
 						if err == nil {
@@ -278,6 +291,10 @@ func (config Config) MonitorConfig(zone_dir string) {
 						log.Println("new file:", event.Name)
 
 						myconfig, err := ReadZone(event.Name, time.Now())
+
+						if err != nil {
+							log.Warn(err)
+						}
 
 						err = checkConfigDomainMatch(event.Name, myconfig.Domain.Domain)
 
@@ -347,7 +364,7 @@ func ApplyDefaults(config *ConfigArr, lastModified time.Time) {
 	}
 
 	// Set the lastModified time if specified (e.g from S3 LastModified attribute)
-	if lastModified.IsZero() == false {
+	if !lastModified.IsZero() {
 		config.Domain.Modified = lastModified
 	}
 
@@ -578,8 +595,7 @@ func ReadZone(zone_file string, lastModified time.Time) (myconfig ConfigArr, err
 func checkConfigDomainMatch(filename string, domain string) (err error) {
 
 	// TODO: Improve domain lookup and confirmation
-	filecheck := filepath.Base(filename)
-	filecheck = strings.Replace(filename, ".toml", "", 1)
+	filecheck := strings.Replace(filepath.Base(filename), ".toml", "", 1)
 
 	if filecheck != domain {
 		err = fmt.Errorf("Config file %s (%s) does not match domain entry %s", filename, filecheck, domain)
